@@ -11,9 +11,13 @@ use tokio::net::TcpStream;
 async fn main() -> tokio::io::Result<()> {
     dotenv().ok();
 
-    let server_address = env::var("SERVER_ADDRESS");
-    let host = env::var("HOST");
-    let port: u16 = env::var("PORT");
+    let server_address =
+        env::var("SERVER_ADDRESS").expect("SERVER_ADDRESS environment variable not set");
+    let host = env::var("HOST").expect("HOST environment variable not set");
+    let port: u16 = env::var("PORT")
+        .expect("PORT environment variable not set")
+        .parse()
+        .expect("PORT must be a valid u16");
 
     let mut stream = TcpStream::connect(&server_address)
         .await
