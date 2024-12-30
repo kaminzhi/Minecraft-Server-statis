@@ -1,29 +1,45 @@
-use tokio::io;
-use tokio::net::TcpStream;
+mod minecraft;
 mod protocol;
-use protocol::{read_varint, send_handshake, send_status_request};
+
+use dotenv::dotenv;
+use minecraft::{parse_response, read_server_response};
+use protocol::{send_handshake, send_status_request};
+use std::env;
+use tokio::net::TcpStream;
 
 #[tokio::main]
-async fn main() -> io::Result<()> {
-    let host = "mc.hypixel.net";
-    let port = 25565;
+async fn main() -> tokio::io::Result<()> {
+    dotenv().ok();
 
-    let addr = format!("{}:{}", host, port);
-    let mut stream = TcpStream::connect(addr).await?;
+    let server_address = env::var("SERVER_ADDRESS");
+    let host = env::var("HOST");
+    let port: u16 = env::var("PORT");
 
-    println!("Connected to the server!");
+    let mut stream = TcpStream::connect(&server_address)
+        .await
+        .expect("Unable to connect to the server");
 
-    println!("Sending handshake...");
-    send_handshake(&mut stream, host, port).await?;
-    println!("Handshake sent.");
-
-    println!("Sending status request...");
+    send_handshake(&mut stream, &host, port).await?;
     send_status_request(&mut stream).await?;
-    println!("Status request sent.");
 
-    println!("Waiting for response...");
-    let response = read_varint(&mut stream).await?;
-    println!("Response received: {}", response);
+    let response = read_server_response(&mut stream).await?;
+    match parse_response(&response) {
+        Ok(data) => {
+            println!("Description: {}", data.description);
+            println!("Players: {}/{}", data.players.online, data.players.max);
+            println!(
+                "Version: {} (protocol {})",
+                data.version.name, data.version.protocol
+            );
+
+            if let Some(favicon_data) = data.favicon {
+                println!("Favicon base64 data: {}", favicon_data);
+            }
+        }
+        Err(e) => {
+            println!("Error parsing server response: {}", e);
+        }
+    }
 
     Ok(())
 }
