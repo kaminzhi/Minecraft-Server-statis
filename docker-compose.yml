@@ -1,0 +1,16 @@
+version: "3.8"
+
+services:
+  mcserver-status:
+    build: .
+    container_name: mcserver-status
+    environment:
+      - SERVER_ADDRESS=nas.kaminzhi.com:25567
+      - PORT=25567
+      - HOST=nas.kaminzhi.com
+    stdin_open: true # 讓容器保持開放以便您可以交互
+    tty: true
+    ports:
+      - "25562:25562" # 將容器的 25565 端口映射到主機的 25565 端口（假設 Minecraft 伺服器是這個端口）
+    restart: always # 如果容器停止運行，則自動重新啟動
+
