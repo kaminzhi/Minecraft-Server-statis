@@ -82,11 +82,13 @@ pub async fn fetch_server_status(
     };
 
     let result = json!({
+        "host": host,
+        "port": port,
         "description": data.description.text.unwrap_or_default(),
         "players": {
             "online": data.players.online,
             "max": data.players.max,
-            "sample": data.players.sample.map(|s| s.into_iter().map(|p| p.name).collect::<Vec<_>>())
+            "members": data.players.sample.map(|s| s.into_iter().map(|p| p.name).collect::<Vec<_>>())
         },
         "version": data.version.name,
         "favicon": favicon_cleaned,
