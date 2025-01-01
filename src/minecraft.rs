@@ -4,8 +4,6 @@ use serde_json::json;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpStream;
 
-use serde_json::Value;
-
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Players {
     pub online: u32,
@@ -20,9 +18,10 @@ pub struct Player {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct Description {
-    pub text: Option<String>, // Handle optional fields gracefully
-    pub extra: Option<Value>, // Generic additional fields
+#[serde(untagged)]
+pub enum Description {
+    Text(String),
+    Object { text: String },
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -70,6 +69,11 @@ pub async fn fetch_server_status(
     let response = read_server_response(&mut stream).await?;
     let data: MinecraftResponse = parse_response(&response)?;
 
+    let description_text = match data.description {
+        Description::Text(text) => text,
+        Description::Object { text } => text,
+    };
+
     let favicon_cleaned = if let Some(favicon_data) = data.favicon {
         if let Some(index) = favicon_data.find(",") {
             let actual_base64 = &favicon_data[index + 1..];
@@ -81,19 +85,29 @@ pub async fn fetch_server_status(
         None
     };
 
+    let players_sample =
+        if data.players.online > 0 && data.players.sample.as_ref().map_or(true, |s| s.is_empty()) {
+            Some(vec!["Not Support".to_string()])
+        } else {
+            data.players
+                .sample
+                .map(|s| s.into_iter().map(|p| p.name).collect::<Vec<_>>())
+        };
+
     let result = json!({
         "host": host,
         "port": port,
-        "description": data.description.text.unwrap_or_default(),
+        "description": description_text,
         "players": {
             "online": data.players.online,
             "max": data.players.max,
-            "members": data.players.sample.map(|s| s.into_iter().map(|p| p.name).collect::<Vec<_>>())
+            "members": players_sample,
         },
         "version": data.version.name,
+        "protocol": data.version.protocol,
         "favicon": favicon_cleaned,
-
     });
 
+    // println!("Raw server response: {}", response);
     Ok(serde_json::to_string_pretty(&result)?)
 }
